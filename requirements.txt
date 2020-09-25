@@ -1,0 +1,6 @@
+torch~=1.6.0
+numpy
+tqdm
+pandas
+matplotlib
+jupyter
