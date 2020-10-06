@@ -6,8 +6,58 @@ import numpy as np
 from tqdm import tqdm
 
 
-def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_camids: np.ndarray, g_camids: np.ndarray,
-              max_rank=50, test_ratio=1):
+def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_camids: np.ndarray,
+             g_camids: np.ndarray, max_rank=50):
+    distmat = np.array(distmat, copy=False)
+    q_pids, g_pids = np.array(q_pids, copy=False), np.array(g_pids, copy=False)
+    q_camids, g_camids = np.array(q_camids, copy=False), np.array(g_camids, copy=False)
+    num_q, num_g = distmat.shape
+    if num_g < max_rank:
+        max_rank = num_g
+        print("Note: number of gallery samples is quite small, got {}".format(num_g))
+    indices = np.argsort(distmat, axis=1)
+    matches = (g_pids[indices] == q_pids[:, np.newaxis]).astype(np.int32)
+
+    order = indices
+    remove = (g_pids[order] == q_pids.reshape(-1, 1)) & (g_camids[order] == q_camids.reshape(-1, 1))
+    keep = np.invert(remove)
+    kept = keep.cumsum(axis=1)
+
+    q, g = len(q_pids), len(g_pids)
+
+    valid_matches = matches * keep
+    valid_query = (valid_matches.sum(axis=1) > 0)  # at least one matchable (== matched) gallery image
+    assert (valid_matches.sum() != 0)  # error: all query identities do not appear in gallery
+
+    final_rank_positions = np.argmax(valid_matches * np.arange(1, g + 1), axis=1)
+    final_rank_valid = kept[np.arange(q), final_rank_positions]
+    all_INP = valid_matches.sum(axis=1) / final_rank_valid.astype("float")
+
+    # `kept` is analogous to index within only-valid instances
+    cum_precision = (valid_matches.cumsum(axis=1) / kept.astype("float"))
+    cum_precision[np.isnan(cum_precision)] = 1
+    all_AP = (cum_precision * valid_matches).sum(axis=1) / valid_matches.sum(axis=1)
+
+    # Compute CMC (need to go query-by-query) (assume up to ~50 invalid gallery images)
+    keep = keep[:, :max_rank * 2 + 50]
+    matches = matches[:, :max_rank * 2 + 50]
+    all_cmc = []
+    for i in range(q):
+        cmc = matches[i][keep[i]].cumsum()
+        # E.g., 0 1 x x x x ... to 0 1 1 1 1 1 ...
+        cmc[cmc > 1] = 1
+        all_cmc.append(cmc[:max_rank])
+    all_cmc = np.asarray(all_cmc).astype(np.float32)
+    all_cmc = all_cmc.sum(0) / valid_query.astype("int").sum()
+
+    mAP = np.mean(all_AP[valid_query])
+    mINP = np.mean(all_INP[valid_query])
+
+    return all_cmc, mAP, mINP
+
+
+def evaluate_old(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_camids: np.ndarray,
+                 g_camids: np.ndarray, max_rank=50, test_ratio=1):
     """
     Evaluation with market1501 metric (used for Market, Duke, MSMT)
     Key: for each query identity, its gallery images from the same camera view are discarded.
@@ -45,7 +95,7 @@ def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_cami
         # binary vector, positions with value 1 are correct matches
         # E.g., 0 1 1 0 1 1 0 ...
         orig_cmc = matches[q_idx][keep]
-        #orig_cmc = matches[q_idx]
+        # orig_cmc = matches[q_idx]
         if not np.any(orig_cmc):
             # this condition is true when query identity does not appear in gallery
             continue
@@ -78,3 +128,4 @@ def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_cami
     mINP = np.mean(all_INP)
 
     return all_cmc, mAP, mINP
+
