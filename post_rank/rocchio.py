@@ -16,28 +16,37 @@ def adjust_qf(qf, gf, positive_indices, negative_indices, alpha=1, beta=0.65, ga
 
 
 def rocchio(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
-            inplace=True, previous_distmat=None, direct_feedback=True, alpha=1, beta=0.65, gamma=0.35):
+            inplace=True, previous_distmat=None, direct_feedback=True, alpha=1, beta=0.65, gamma=0.35, device=None):
     """
-    qf: q x m
-    gf: g x m
-    q_pids: q
-    g_pids: g
-    positive_indices: q x g
-    negative_indices: q x g
-    previous_distmat: adjusted distmat (== compute_distmat(qf, gf) only at init)
-    :param direct_feedback: Whether to apply feedback to distmat directly (pos=0, neg=inf)
+    Args:
+        qf: q * m
+        gf: g * m
+        q_pids: q
+        g_pids: g
+        positive_indices: q * g
+        negative_indices: q * g
+        inplace:
+        previous_distmat: distmat for adjusted_qf (== compute_distmat(qf, gf) only at init)
+        direct_feedback: Whether to apply feedback to distmat directly (pos=0, neg=inf)
+        alpha:
+        beta:
+        gamma:
+        device: CUDA device. Other Tensor arguments must also be on this device, if specified.
+    Returns:
     """
     q, g = qf.shape[0], gf.shape[0]
     assert (qf.shape[1] == gf.shape[1])
 
-    if positive_indices is None: positive_indices = init_feedback_indices(q, g)
-    if negative_indices is None: negative_indices = init_feedback_indices(q, g)
+    if positive_indices is None: positive_indices = init_feedback_indices(q, g, device=device)
+    if negative_indices is None: negative_indices = init_feedback_indices(q, g, device=device)
 
     if previous_distmat is None:
         qf_adjusted = adjust_qf(qf, gf, positive_indices, negative_indices)
         distmat = compute_distmat(qf_adjusted, gf)
     else:
         distmat = previous_distmat
+        if device:
+            distmat = distmat.cuda(device)
 
     positive_indices, negative_indices = greedy_feedback(distmat, q_pids, g_pids, positive_indices,
                                                          negative_indices, inplace=inplace)

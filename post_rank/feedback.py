@@ -3,8 +3,8 @@ import torch
 from utils.distmat import compute_distmat
 
 
-def init_feedback_indices(q, g):
-    return torch.zeros((q, g), dtype=torch.bool)
+def init_feedback_indices(q, g, device=None):
+    return torch.zeros((q, g), dtype=torch.bool, device=device)
 
 
 def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=True):
