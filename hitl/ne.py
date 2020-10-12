@@ -13,7 +13,7 @@ from utils.evaluation import evaluate
 def compute_neighborhood_distmat(distmat_qg, qf, gf, positive_indices_qg, negative_indices_qg, method="min",
                                  device=None, verbose=0):
     """
-    :param qg_distmat: (q + g) * g
+    :param distmat_qg: (q + g) * g
     :param qf:
     :param gf:
     :param positive_indices_qg:
@@ -101,6 +101,6 @@ def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, method="min", device=No
         res = ne_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices, distmat_qg, method=method,
                        verbose=0, device=device)
         distmat, positive_indices, negative_indices, distmat_qg = res
-    result = evaluate(distmat.cpu().numpy(), q_pids, g_pids, q_camids, g_camids)
+    result = evaluate(distmat, q_pids, g_pids, q_camids, g_camids, device=device)
     print("Results after {} rounds of neighborhood expansion ({}):".format(t, method), "mAP", result[1], "mINP",
           result[2])

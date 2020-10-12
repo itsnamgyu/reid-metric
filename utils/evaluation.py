@@ -3,11 +3,81 @@ Code based on bag-of-tricks repo:
 https://github.com/michuanhaohao/reid-strong-baseline
 """
 import numpy as np
+import torch
 from tqdm import tqdm
 
 
-def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_camids: np.ndarray,
-             g_camids: np.ndarray, max_rank=50):
+def evaluate(distmat: torch.Tensor, q_pids: torch.Tensor, g_pids: torch.Tensor, q_camids: torch.Tensor,
+             g_camids: torch.Tensor, max_rank=50, device=None):
+    """
+    Torch implementation of evaluate. Slower on CPU.
+
+    :param distmat:
+    :param q_pids:
+    :param g_pids:
+    :param q_camids:
+    :param g_camids:
+    :param max_rank:
+    :return:
+    """
+    distmat = torch.as_tensor(distmat, device=device)
+    q_pids = torch.as_tensor(q_pids, device=device)
+    g_pids = torch.as_tensor(g_pids, device=device)
+    q_camids = torch.as_tensor(q_camids, device=device)
+    g_camids = torch.as_tensor(g_camids, device=device)
+    num_q, num_g = distmat.shape
+
+    if num_g < max_rank:
+        max_rank = num_g
+        print("Note: number of gallery samples is quite small, got {}".format(num_g))
+    indices = distmat.argsort(dim=1)
+    matches = (g_pids[indices] == q_pids.reshape(-1, 1)).int()
+
+    order = indices
+    remove = (g_pids[order] == q_pids.reshape(-1, 1)) & (g_camids[order] == q_camids.reshape(-1, 1))
+    keep = remove == False
+    kept = keep.cumsum(dim=1)
+
+    q, g = len(q_pids), len(g_pids)
+
+    valid_matches = matches * keep
+    valid_query = (valid_matches.sum(dim=1) > 0)  # at least one matchable (== matched) gallery image
+    assert (valid_matches.sum() != 0)  # error: all query identities do not appear in gallery
+
+    final_rank_positions = (valid_matches * torch.arange(1, g + 1, device=device)).argmax(dim=1)
+    final_rank_valid = kept[torch.arange(q, device=device), final_rank_positions]
+    all_INP = valid_matches.sum(dim=1).float() / final_rank_valid.float()
+
+    # `kept` is analogous to index within only-valid instances
+    cum_precision = valid_matches.cumsum(dim=1).float() / kept.float()
+    cum_precision[cum_precision.isnan()] = 1
+    all_AP = (cum_precision * valid_matches).sum(dim=1) / valid_matches.sum(dim=1)
+
+    # Compute CMC (need to go query-by-query) (assume that at least 10% are valid)
+    buffer = 10
+    keep = keep[:, :max_rank * buffer]
+    matches = matches[:, :max_rank * buffer]
+    all_cmc = []
+    for i in range(q):
+        mc = matches[i][keep[i]][:50]
+        if len(mc) < max_rank:
+            raise AssertionError("Not enough matching galleries. Consider higher `buffer` value.")
+        cmc = mc[:max_rank].cumsum(dim=0)
+        # E.g., 0 1 x x x x ... to 0 1 1 1 1 1 ...
+        cmc[cmc > 1] = 1
+        all_cmc.append(cmc)
+
+    all_cmc = torch.stack(all_cmc).float()
+    all_cmc = all_cmc.sum(dim=0) / valid_query.float().sum()
+
+    mAP = all_AP[valid_query].mean()
+    mINP = all_INP[valid_query].mean()
+
+    return all_cmc.cpu().numpy(), mAP.item(), mINP.item()
+
+
+def evaluate_np(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_camids: np.ndarray,
+                g_camids: np.ndarray, max_rank=50):
     """
     Vectorized re-implementation of evaluation code. (still numpy :()
 

@@ -80,5 +80,5 @@ def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, device=None):
         res = rocchio_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices,
                             previous_distmat=distmat, device=device)
         distmat, positive_indices, negative_indices = res
-    result = evaluate(distmat.cpu().numpy(), q_pids, g_pids, q_camids, g_camids)
+    result = evaluate(distmat, q_pids, g_pids, q_camids, g_camids, device=device)
     print("Results after {} rounds of Rocchio:".format(t), "mAP", result[1], "mINP", result[2])
