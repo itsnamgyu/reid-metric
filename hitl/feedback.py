@@ -25,7 +25,7 @@ def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices,
     :param positive_indices: q x g
     :param negative_indices: q x g
     :return:
-    (positive_indices, negative_indices)
+    (positive_indices, negative_indices, matches)
     """
     q, g = tuple(distmat.shape)
 
@@ -51,7 +51,7 @@ def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices,
     assert (not existing.any())
     negative_indices[negative_q, negative_g] = True
 
-    return positive_indices, negative_indices
+    return positive_indices, negative_indices, pmap
 
 
 def greedy_feedback_qg(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=True):
@@ -69,8 +69,9 @@ def greedy_feedback_qg(distmat, q_pids, g_pids, positive_indices, negative_indic
     if inplace is False:
         raise NotImplementedError()
     else:
-        greedy_feedback(distmat[:q, :], q_pids, g_pids, positive_indices[:, q:], negative_indices[:, q:], inplace=True)
-        return positive_indices, negative_indices
+        _, _, matches = greedy_feedback(distmat[:q, :], q_pids, g_pids, positive_indices[:, q:],
+                                        negative_indices[:, q:], inplace=True)
+        return positive_indices, negative_indices, matches
 
 
 def naive_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
@@ -96,10 +97,10 @@ def naive_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=
         distmat = previous_distmat
 
     res = greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=inplace)
-    positive_indices, negative_indices = res
+    positive_indices, negative_indices, matches = res
 
     distmat = compute_distmat(qf, gf)
     distmat[positive_indices] = 0
     distmat[negative_indices] = float("inf")
 
-    return distmat, positive_indices, negative_indices
+    return distmat, positive_indices, negative_indices, matches

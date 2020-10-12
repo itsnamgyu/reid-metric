@@ -49,8 +49,8 @@ def rocchio_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indice
         if device:
             distmat = distmat.cuda(device)
 
-    positive_indices, negative_indices = greedy_feedback(distmat, q_pids, g_pids, positive_indices,
-                                                         negative_indices, inplace=inplace)
+    positive_indices, negative_indices, matches = greedy_feedback(distmat, q_pids, g_pids, positive_indices,
+                                                                  negative_indices, inplace=inplace)
     qf_adjusted = adjust_qf(qf, gf, positive_indices, negative_indices, alpha=alpha, beta=beta, gamma=gamma)
     distmat = compute_distmat(qf_adjusted, gf)
 
@@ -59,7 +59,7 @@ def rocchio_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indice
         distmat[positive_indices] = 0
         distmat[negative_indices] = float("inf")
 
-    return distmat, positive_indices, negative_indices
+    return distmat, positive_indices, negative_indices, matches
 
 
 def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, device=None):
@@ -79,6 +79,8 @@ def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, device=None):
     for _ in tqdm(range(t)):
         res = rocchio_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices,
                             previous_distmat=distmat, device=device)
-        distmat, positive_indices, negative_indices = res
+        distmat, positive_indices, negative_indices, matches = res
+        del matches
     result = evaluate(distmat, q_pids, g_pids, q_camids, g_camids, device=device)
     print("Results after {} rounds of Rocchio:".format(t), "mAP", result[1], "mINP", result[2])
+    return distmat

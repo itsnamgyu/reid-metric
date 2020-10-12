@@ -82,14 +82,14 @@ def ne_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=Non
     if positive_indices is None: positive_indices = init_feedback_indices_qg(q, g, True, device=device)
     if negative_indices is None: negative_indices = init_feedback_indices_qg(q, g, False, device=device)
 
-    positive_indices, negative_indices = greedy_feedback_qg(distmat_qg, q_pids, g_pids, positive_indices,
-                                                            negative_indices)
+    positive_indices, negative_indices, matches = greedy_feedback_qg(distmat_qg, q_pids, g_pids, positive_indices,
+                                                                     negative_indices)
     if verbose:
         print("Computing min neighborhood distmat")
     distmat = compute_neighborhood_distmat(distmat_qg, qf, gf, positive_indices, negative_indices, method=method,
                                            device=device, verbose=verbose)
 
-    return distmat, positive_indices, negative_indices, distmat_qg
+    return distmat, positive_indices, negative_indices, distmat_qg, matches
 
 
 def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, method="min", device=None):
@@ -100,7 +100,9 @@ def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, method="min", device=No
     for _ in tqdm(range(t)):
         res = ne_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices, distmat_qg, method=method,
                        verbose=0, device=device)
-        distmat, positive_indices, negative_indices, distmat_qg = res
+        distmat, positive_indices, negative_indices, distmat_qg, matches = res
+        del matches
     result = evaluate(distmat, q_pids, g_pids, q_camids, g_camids, device=device)
     print("Results after {} rounds of neighborhood expansion ({}):".format(t, method), "mAP", result[1], "mINP",
           result[2])
+    return distmat
