@@ -74,7 +74,7 @@ def greedy_feedback_qg(distmat, q_pids, g_pids, positive_indices, negative_indic
 
 
 def naive_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
-                inplace=True, previous_distmat=None):
+                inplace=True, previous_distmat=None, device=None):
     """
     qf: q x m
     gf: g x m
@@ -87,8 +87,8 @@ def naive_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=
     q, g = qf.shape[0], gf.shape[0]
     assert (qf.shape[1] == gf.shape[1])
 
-    if positive_indices is None: positive_indices = init_feedback_indices(q, g)
-    if negative_indices is None: negative_indices = init_feedback_indices(q, g)
+    if positive_indices is None: positive_indices = init_feedback_indices(q, g, device=device)
+    if negative_indices is None: negative_indices = init_feedback_indices(q, g, device=device)
 
     if previous_distmat is None:
         distmat = compute_distmat(qf, gf)
