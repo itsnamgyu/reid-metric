@@ -7,6 +7,13 @@ def init_feedback_indices(q, g, device=None):
     return torch.zeros((q, g), dtype=torch.bool, device=device)
 
 
+def init_feedback_indices_qg(q, g, positive=False, device=None):
+    indices = torch.zeros(q, q + g, dtype=torch.bool, device=device)
+    if positive:
+        indices[torch.arange(q), torch.arange(q)] = True
+    return indices
+
+
 def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=True):
     """
     Update positive_indices, negative_indices with one round of feedback. Provide feedback for top-ranked gallery.
@@ -47,8 +54,27 @@ def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices,
     return positive_indices, negative_indices
 
 
-def naive(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
-          inplace=True, previous_distmat=None):
+def greedy_feedback_qg(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=True):
+    """
+    :param distmat: (q + g) * g
+    :param q_pids: q
+    :param g_pids: g
+    :param positive_indices: q * (q + g)
+    :param negative_indices: q * (q + g
+    :param inplace:
+    :return:
+    """
+    q, g = q_pids.shape[0], g_pids.shape[0]
+
+    if inplace is False:
+        raise NotImplementedError()
+    else:
+        greedy_feedback(distmat[:q, :], q_pids, g_pids, positive_indices[:, q:], negative_indices[:, q:], inplace=True)
+        return positive_indices, negative_indices
+
+
+def naive_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
+                inplace=True, previous_distmat=None):
     """
     qf: q x m
     gf: g x m

@@ -1,6 +1,6 @@
 from tqdm import tqdm
 
-from post_rank.feedback import init_feedback_indices, greedy_feedback
+from hitl.feedback import init_feedback_indices, greedy_feedback
 from utils.distmat import compute_distmat
 from utils.evaluation import evaluate
 
@@ -15,8 +15,9 @@ def adjust_qf(qf, gf, positive_indices, negative_indices, alpha=1, beta=0.65, ga
     return qf_adjusted
 
 
-def rocchio(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
-            inplace=True, previous_distmat=None, direct_feedback=True, alpha=1, beta=0.65, gamma=0.35, device=None):
+def rocchio_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
+                  inplace=True, previous_distmat=None, direct_feedback=True, alpha=1, beta=0.65, gamma=0.35,
+                  device=None):
     """
     Args:
         qf: q * m
@@ -61,13 +62,23 @@ def rocchio(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None
     return distmat, positive_indices, negative_indices
 
 
-def example_usage(qf, gf, q_pids, g_pids, q_camids, g_camids):
+def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, device=None):
+    """
+    :param qf: torch.Tensor(q, m)
+    :param gf: torch.Tensor(g, m)
+    :param q_pids: torch.Tensor(q)
+    :param g_pids: torch.Tensor(g)
+    :param q_camids: torch.Tensor(q)
+    :param g_camids: torch.Tensor(g)
+    :return:
+    """
     # These will be initialized automatically
     positive_indices = None
     negative_indices = None
     distmat = None
-    for _ in tqdm(range(5)):
-        res = rocchio(qf, gf, q_pids, g_pids, positive_indices, negative_indices, previous_distmat=distmat)
+    for _ in tqdm(range(t)):
+        res = rocchio_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices,
+                            previous_distmat=distmat, device=device)
         distmat, positive_indices, negative_indices = res
-    result = evaluate(distmat, q_pids, g_pids, q_camids, g_camids)
-    print("mAP", result[1], "mINP", result[2])
+    result = evaluate(distmat.cpu().numpy(), q_pids, g_pids, q_camids, g_camids)
+    print("Results after {} rounds of Rocchio:".format(t), "mAP", result[1], "mINP", result[2])
