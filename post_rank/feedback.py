@@ -7,16 +7,6 @@ def init_feedback_indices(q, g):
     return torch.zeros((q, g), dtype=torch.bool)
 
 
-def adjust_qf(qf, gf, positive_indices, negative_indices, alpha=1, beta=0.65, gamma=0.35):
-    assert (qf.shape[1] == gf.shape[1])
-    mean_positive_gf = positive_indices.float().mm(gf) / positive_indices.float().sum(dim=1, keepdim=True)
-    mean_negative_gf = negative_indices.float().mm(gf) / negative_indices.float().sum(dim=1, keepdim=True)
-    mean_positive_gf[mean_positive_gf.isnan()] = 0
-    mean_negative_gf[mean_negative_gf.isnan()] = 0
-    qf_adjusted = qf * alpha + mean_positive_gf * beta - mean_negative_gf * gamma
-    return qf_adjusted
-
-
 def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=True):
     """
     Update positive_indices, negative_indices with one round of feedback. Provide feedback for top-ranked gallery.

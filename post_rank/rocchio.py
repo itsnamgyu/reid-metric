@@ -1,8 +1,18 @@
 from tqdm import tqdm
 
-from post_rank.feedback import init_feedback_indices, adjust_qf, greedy_feedback
+from post_rank.feedback import init_feedback_indices, greedy_feedback
 from utils.distmat import compute_distmat
 from utils.evaluation import evaluate
+
+
+def adjust_qf(qf, gf, positive_indices, negative_indices, alpha=1, beta=0.65, gamma=0.35):
+    assert (qf.shape[1] == gf.shape[1])
+    mean_positive_gf = positive_indices.float().mm(gf) / positive_indices.float().sum(dim=1, keepdim=True)
+    mean_negative_gf = negative_indices.float().mm(gf) / negative_indices.float().sum(dim=1, keepdim=True)
+    mean_positive_gf[mean_positive_gf.isnan()] = 0
+    mean_negative_gf[mean_negative_gf.isnan()] = 0
+    qf_adjusted = qf * alpha + mean_positive_gf * beta - mean_negative_gf * gamma
+    return qf_adjusted
 
 
 def rocchio(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
