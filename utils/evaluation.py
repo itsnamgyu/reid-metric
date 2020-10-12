@@ -11,16 +11,13 @@ def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_cami
     """
     Vectorized re-implementation of evaluation code. (still numpy :()
 
-    Args:
-        distmat:
-        q_pids:
-        g_pids:
-        q_camids:
-        g_camids:
-        max_rank:
-
-    Returns:
-
+    :param distmat:
+    :param q_pids:
+    :param g_pids:
+    :param q_camids:
+    :param g_camids:
+    :param max_rank:
+    :return:
     """
     distmat = np.array(distmat, copy=False)
     q_pids, g_pids = np.array(q_pids, copy=False), np.array(g_pids, copy=False)
