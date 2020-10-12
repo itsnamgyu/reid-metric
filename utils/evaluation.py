@@ -8,6 +8,20 @@ from tqdm import tqdm
 
 def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_camids: np.ndarray,
              g_camids: np.ndarray, max_rank=50):
+    """
+    Vectorized re-implementation of evaluation code. (still numpy :()
+
+    Args:
+        distmat:
+        q_pids:
+        g_pids:
+        q_camids:
+        g_camids:
+        max_rank:
+
+    Returns:
+
+    """
     distmat = np.array(distmat, copy=False)
     q_pids, g_pids = np.array(q_pids, copy=False), np.array(g_pids, copy=False)
     q_camids, g_camids = np.array(q_camids, copy=False), np.array(g_camids, copy=False)
@@ -31,23 +45,29 @@ def evaluate(distmat: np.ndarray, q_pids: np.ndarray, g_pids: np.ndarray, q_cami
 
     final_rank_positions = np.argmax(valid_matches * np.arange(1, g + 1), axis=1)
     final_rank_valid = kept[np.arange(q), final_rank_positions]
-    all_INP = valid_matches.sum(axis=1) / final_rank_valid.astype("float")
+    all_INP = valid_matches.sum(axis=1).astype(np.float32) / final_rank_valid.astype(np.float32)
 
     # `kept` is analogous to index within only-valid instances
-    cum_precision = (valid_matches.cumsum(axis=1) / kept.astype("float"))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        cum_precision = valid_matches.cumsum(axis=1).astype(np.float32) / kept.astype(np.float32)
     cum_precision[np.isnan(cum_precision)] = 1
     all_AP = (cum_precision * valid_matches).sum(axis=1) / valid_matches.sum(axis=1)
 
-    # Compute CMC (need to go query-by-query) (assume up to ~50 invalid gallery images)
-    keep = keep[:, :max_rank * 2 + 50]
-    matches = matches[:, :max_rank * 2 + 50]
+    # Compute CMC (need to go query-by-query) (assume that at least 10% are valid)
+    buffer = 10
+    keep = keep[:, :max_rank * buffer]
+    matches = matches[:, :max_rank * buffer]
     all_cmc = []
     for i in range(q):
-        cmc = matches[i][keep[i]].cumsum()
+        mc = matches[i][keep[i]][:50]
+        if len(mc) < max_rank:
+            raise AssertionError("Not enough matching galleries. Consider higher `buffer` value.")
+        cmc = mc[:max_rank].cumsum()
         # E.g., 0 1 x x x x ... to 0 1 1 1 1 1 ...
         cmc[cmc > 1] = 1
-        all_cmc.append(cmc[:max_rank])
-    all_cmc = np.asarray(all_cmc).astype(np.float32)
+        all_cmc.append(cmc)
+
+    all_cmc = np.stack(all_cmc).astype(np.float32)
     all_cmc = all_cmc.sum(0) / valid_query.astype("int").sum()
 
     mAP = np.mean(all_AP[valid_query])
