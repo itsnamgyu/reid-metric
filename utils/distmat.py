@@ -2,8 +2,8 @@
 Rerank code based on bag-of-tricks repo:
 https://github.com/michuanhaohao/reid-strong-baseline
 """
-import torch
 import numpy as np
+import torch
 
 
 def compute_distmat(qf: torch.Tensor, gf: torch.Tensor):
@@ -54,7 +54,7 @@ def rerank_distmat(all_distmat: torch.Tensor, q, k1=20, k2=6, lambda_value=0.3, 
         Tensor(q, g) if cut else Tensor(q + g, q + g)
         Euclidean squared distance
     """
-    all_distmat = all_distmat.numpy()  # TODO
+    all_distmat = all_distmat.cpu().numpy()  # TODO
     assert(all_distmat.shape[0] == all_distmat.shape[1])
     all_num = all_distmat.shape[0]
     query_num = q
