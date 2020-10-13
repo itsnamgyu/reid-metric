@@ -5,7 +5,7 @@ Neighborhood Expansion Algorithm
 import torch
 from tqdm import tqdm
 
-from hitl.feedback import init_feedback_indices_qg, greedy_feedback_qg
+from hitl.feedback import init_feedback_indices_qg, greedy_feedback
 from utils.distmat import compute_distmat
 from utils.evaluation import evaluate
 
@@ -61,8 +61,8 @@ def compute_distmat_qg(qf, gf):
     return compute_distmat(torch.cat([qf, gf]), gf)
 
 
-def ne_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None, distmat_qg=None, method="min",
-             device=None, verbose=1):
+def ne_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None, distmat=None, distmat_qg=None,
+             method="min", device=None, verbose=1):
     """
     Only inplace is supported
     :param qf: q * m
@@ -71,7 +71,8 @@ def ne_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=Non
     :param g_pids: g
     :param positive_indices: q * (q + g)
     :param negative_indices: q * (q + g)
-    :param distmat_qg: (q + g) * g
+    :param distmat: previous distmat (with NE)
+    :param distmat_qg: (q + g) * g (without NE)
     :param device: CUDA device. Other Tensor arguments must also be on this device, if specified.
     :return:
     """
@@ -81,11 +82,16 @@ def ne_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=Non
     if distmat_qg is None:
         distmat_qg = compute_distmat_qg(qf, gf)
 
+    if distmat is None:
+        distmat = compute_distmat(qf, gf)
+
     if positive_indices is None: positive_indices = init_feedback_indices_qg(q, g, True, device=device)
     if negative_indices is None: negative_indices = init_feedback_indices_qg(q, g, False, device=device)
 
-    positive_indices, negative_indices, matches = greedy_feedback_qg(distmat_qg, q_pids, g_pids, positive_indices,
-                                                                     negative_indices)
+    _, _, matches = greedy_feedback(distmat, q_pids, g_pids,
+                                    positive_indices[:, q:], negative_indices[:, q:],
+                                    inplace=True)
+    del _
     if verbose:
         print("Computing min neighborhood distmat")
     distmat = compute_neighborhood_distmat(distmat_qg, qf, gf, positive_indices, negative_indices, method=method,
@@ -100,10 +106,11 @@ def run(qf, gf, q_pids, g_pids, q_camids, g_camids, t=5, method="min", device=No
     distmat = None
     distmat_qg = None
     for _ in tqdm(range(t)):
-        res = ne_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices, distmat_qg, method=method,
+        res = ne_round(qf, gf, q_pids, g_pids, positive_indices, negative_indices, distmat, distmat_qg, method=method,
                        verbose=0, device=device)
         distmat, positive_indices, negative_indices, distmat_qg, matches = res
         del matches
+    del res, distmat_qg, positive_indices, negative_indices
     result = evaluate(distmat, q_pids, g_pids, q_camids, g_camids, device=device)
     print("Results after {} rounds of neighborhood expansion ({}):".format(t, method), "mAP", result[1], "mINP",
           result[2])

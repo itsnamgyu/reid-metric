@@ -54,26 +54,6 @@ def greedy_feedback(distmat, q_pids, g_pids, positive_indices, negative_indices,
     return positive_indices, negative_indices, pmap
 
 
-def greedy_feedback_qg(distmat, q_pids, g_pids, positive_indices, negative_indices, inplace=True):
-    """
-    :param distmat: (q + g) * g
-    :param q_pids: q
-    :param g_pids: g
-    :param positive_indices: q * (q + g)
-    :param negative_indices: q * (q + g
-    :param inplace:
-    :return:
-    """
-    q, g = q_pids.shape[0], g_pids.shape[0]
-
-    if inplace is False:
-        raise NotImplementedError()
-    else:
-        _, _, matches = greedy_feedback(distmat[:q, :], q_pids, g_pids, positive_indices[:, q:],
-                                        negative_indices[:, q:], inplace=True)
-        return positive_indices, negative_indices, matches
-
-
 def naive_round(qf, gf, q_pids, g_pids, positive_indices=None, negative_indices=None,
                 inplace=True, previous_distmat=None, device=None):
     """
