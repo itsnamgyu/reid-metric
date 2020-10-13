@@ -38,6 +38,8 @@ def compute_neighborhood_distmat(distmat_qg, qf, gf, positive_indices_qg, negati
             final_distances, indices = d.min(axis=0)
         elif method == "mean":
             final_distances = d.mean(axis=0)
+        elif method == "max":
+            final_distances = d.max(axis=0)
         else:
             raise ValueError()
         distmat[i] = final_distances
