@@ -10,7 +10,7 @@ from utils.distmat import *
 from utils.evaluation import *
 
 keys = data.get_output_keys()
-methods = ["rocchio", "ne_mean", "ne_max", "ne_min", "re_ne_mean", "re_ne_max", "re_ne_min"]
+methods = ["rocchio", "rocchio_positive", "ne_mean", "ne_max", "ne_min", "re_ne_mean", "re_ne_max", "re_ne_min"]
 parser = argparse.ArgumentParser()
 parser.add_argument("--output", "-O", help="Output key. Omit to display choices.")
 parser.add_argument("--method", "-M", help="Method. Omit to display choices.")
@@ -65,7 +65,7 @@ q, g = qf.shape[0], gf.shape[0]
 rounds = gf.shape[0]
 reduction_rounds = [10, 25, 50, 75, 100, 200, 500, 1000, 2000, 5000]
 
-print("Extracting matches matrix on {} using {}".format(args.output, args.method))
+print("Extracting match matrix on {} using {} method".format(args.output, args.method))
 
 if args.method == "rocchio":
     positive_indices = None
@@ -76,6 +76,31 @@ if args.method == "rocchio":
     for i in tqdm(range(rounds)):
         distmat, positive_indices, negative_indices, matches = rocchio.rocchio_round(
             qf, gf, q_pids, g_pids, positive_indices, negative_indices, previous_distmat=distmat, device=args.device)
+        match_matrix[incomplete, i] = matches.cpu().numpy()
+        if i in reduction_rounds:
+            matches = match_matrix.sum(axis=1)[incomplete]
+            total_matches = (g_pids == q_pids.reshape(-1, 1)).sum(dim=1).cpu().numpy()
+            local_incomplete = matches != total_matches
+            distmat = distmat[local_incomplete, :]
+            positive_indices = positive_indices[local_incomplete, :]
+            negative_indices = negative_indices[local_incomplete, :]
+            q_pids = q_pids[local_incomplete]
+            qf = qf[local_incomplete, :]
+            incomplete[incomplete] = local_incomplete
+
+    save_match_matrix(match_matrix)
+    del positive_indices, negative_indices
+
+elif args.method == "rocchio_positive":
+    positive_indices = None
+    negative_indices = None
+    distmat = compute_distmat(qf, gf)
+    incomplete = np.ones(q, dtype=bool)
+    match_matrix = np.zeros((q, g), dtype=bool)
+    for i in tqdm(range(rounds)):
+        distmat, positive_indices, negative_indices, matches = rocchio.rocchio_round(
+            qf, gf, q_pids, g_pids, positive_indices, negative_indices, previous_distmat=distmat, device=args.device,
+            gamma=0)
         match_matrix[incomplete, i] = matches.cpu().numpy()
         if i in reduction_rounds:
             matches = match_matrix.sum(axis=1)[incomplete]
@@ -105,9 +130,10 @@ elif args.method[:3] == "ne_":
                           positive_indices=positive_indices,
                           negative_indices=negative_indices,
                           distmat=distmat,
-                          distmat_qg=distmat_qg, method="min",
+                          distmat_qg=distmat_qg, method=method,
                           device=args.device, verbose=0)
         distmat, positive_indices, negative_indices, distmat_qg, matches = res
+        del res
         match_matrix[incomplete, i] = matches.cpu().numpy()
         if i in reduction_rounds:
             matches = match_matrix.sum(axis=1)[incomplete]
@@ -124,7 +150,7 @@ elif args.method[:3] == "ne_":
             qf = qf[local_incomplete, :]
             incomplete[incomplete] = local_incomplete
     save_match_matrix(match_matrix)
-    del res, distmat_qg, positive_indices, negative_indices
+    del distmat_qg, positive_indices, negative_indices
 
 elif args.method[:6] == "re_ne_":
     method = args.method[6:]
@@ -143,9 +169,10 @@ elif args.method[:6] == "re_ne_":
                           positive_indices=positive_indices,
                           negative_indices=negative_indices,
                           distmat=distmat,
-                          distmat_qg=distmat_qg, method="min",
+                          distmat_qg=distmat_qg, method=method,
                           device=args.device, verbose=0)
         distmat, positive_indices, negative_indices, distmat_qg, matches = res
+        del res
         match_matrix[incomplete, i] = matches.cpu().numpy()
         if i in reduction_rounds:
             matches = match_matrix.sum(axis=1)[incomplete]
@@ -162,7 +189,7 @@ elif args.method[:6] == "re_ne_":
             qf = qf[local_incomplete, :]
             incomplete[incomplete] = local_incomplete
     save_match_matrix(match_matrix)
-    del res, distmat_qg, positive_indices, negative_indices
+    del distmat_qg, positive_indices, negative_indices
 
 else:
     raise AssertionError("wut?")

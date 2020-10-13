@@ -4,6 +4,7 @@ https://github.com/michuanhaohao/reid-strong-baseline
 """
 import numpy as np
 import torch
+from tqdm import tqdm
 
 
 def compute_distmat(qf: torch.Tensor, gf: torch.Tensor):
@@ -66,7 +67,7 @@ def rerank_distmat(all_distmat: torch.Tensor, q, k1=20, k2=6, lambda_value=0.3, 
     initial_rank = np.argsort(original_dist).astype(np.int32)
 
     print('starting re_ranking')
-    for i in range(all_num):
+    for i in tqdm(range(all_num)):
         # k-reciprocal neighbors
         forward_k_neigh_index = initial_rank[i, :k1 + 1]
         backward_k_neigh_index = initial_rank[forward_k_neigh_index, :k1 + 1]
@@ -87,7 +88,8 @@ def rerank_distmat(all_distmat: torch.Tensor, q, k1=20, k2=6, lambda_value=0.3, 
         k_reciprocal_expansion_index = np.unique(k_reciprocal_expansion_index)
         weight = np.exp(-original_dist[i, k_reciprocal_expansion_index])
         V[i, k_reciprocal_expansion_index] = weight / np.sum(weight)
-    original_dist = original_dist[:query_num, ]
+    if cut:
+        original_dist = original_dist[:query_num, ]
     if k2 != 1:
         V_qe = np.zeros_like(V, dtype=np.float16)
         for i in range(all_num):
